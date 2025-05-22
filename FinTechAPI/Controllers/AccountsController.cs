@@ -35,6 +35,12 @@ namespace FinTechAPI.Controllers
             
             var accounts = await _context.Accounts
                 .Where(a => a.UserId == userId)
+                .Select(a => new AccountDto
+                {
+                    Id = a.Id,
+                    Name = a.Name,
+                    Balance = a.Balance
+                })
                 .ToListAsync();
                 
             return Ok(accounts);
@@ -71,6 +77,7 @@ namespace FinTechAPI.Controllers
                 return Unauthorized();
             }
             
+            // Ensure that the account belongs to the authenticated user
             account.UserId = userId;
             account.CreatedAt = DateTime.UtcNow;
             account.UpdatedAt = DateTime.UtcNow;
@@ -104,8 +111,10 @@ namespace FinTechAPI.Controllers
                 return NotFound();
             }
             
+            // Update account properties
             existingAccount.Name = account.Name;
             existingAccount.AccountType = account.AccountType;
+            existingAccount.Balance = account.Balance;  // Note: Be cautious with direct balance updates in production
             existingAccount.Currency = account.Currency;
             existingAccount.UpdatedAt = DateTime.UtcNow;
             
@@ -145,6 +154,8 @@ namespace FinTechAPI.Controllers
             {
                 return NotFound();
             }
+            
+            // Additional logic could be added here to handle related transactions or data consistency
             
             _context.Accounts.Remove(account);
             await _context.SaveChangesAsync();

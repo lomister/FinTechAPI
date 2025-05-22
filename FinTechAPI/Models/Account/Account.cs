@@ -8,9 +8,9 @@ namespace FinTechAPI.Models
     {
         public int Id { get; set; }
         public string Name { get; set; }
-        public string AccountType { get; set; } // Checking, Savings, Investment, etc.
+        public AccountType AccountType { get; set; } // Checking, Savings, Investment, etc.
         public decimal Balance { get; set; }
-        public string Currency { get; set; } = "USD";
+        public Currency Currency { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         

@@ -5,8 +5,10 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using FinTechAPI.Configuration;
+using FinTechAPI.Data;
 using FinTechAPI.DTOs;
 using FinTechAPI.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -21,15 +23,18 @@ namespace FinTechAPI.Controllers
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
         private readonly AuthSettings _authSettings;
+        private readonly FinTechDbContext _context;
         
         public AuthController(
             UserManager<User> userManager,
             SignInManager<User> signInManager,
-            IOptions<AuthSettings> authSettings)
+            IOptions<AuthSettings> authSettings,
+            FinTechDbContext context)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _authSettings = authSettings.Value;
+            _context = context;
         }
         
         [HttpPost("register")]
@@ -52,6 +57,19 @@ namespace FinTechAPI.Controllers
             
             // Add default role
             await _userManager.AddToRoleAsync(user, "User");
+
+            var account = new Account
+            {
+                Name = "Main",
+                AccountType = AccountType.Checking,
+                Balance = 0,
+                Currency = Currency.USD,
+                UserId = user.Id,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            _context.Accounts.Add(account);
+            await _context.SaveChangesAsync();
             
             return Ok(new UserDto
             {
@@ -79,7 +97,15 @@ namespace FinTechAPI.Controllers
                 return Unauthorized(new { message = "Invalid email or password" });
             }
             
-            var token = GenerateJwtToken(user);
+            var token = await GenerateJwtToken(user);
+            
+            Response.Cookies.Append("Authorization", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,  
+                SameSite = SameSiteMode.None,
+                Expires = DateTimeOffset.Now.AddMinutes(_authSettings.ExpirationInMinutes)
+            });
             
             return Ok(new AuthResponseDto
             {
@@ -95,7 +121,7 @@ namespace FinTechAPI.Controllers
             });
         }
         
-        private string GenerateJwtToken(User user)
+        private async Task<string> GenerateJwtToken(User user)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = Encoding.ASCII.GetBytes(_authSettings.SecretKey);
@@ -103,11 +129,12 @@ namespace FinTechAPI.Controllers
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Email, user.Email)
+                new Claim(ClaimTypes.Email, user.Email!)
             };
             
             // Add roles to claims
-            var roles = _userManager.GetRolesAsync(user).Result;
+            var roles = await _userManager.GetRolesAsync(user);
+
             foreach (var role in roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
