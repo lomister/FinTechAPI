@@ -12,9 +12,10 @@ namespace FinTechAPI.Data
         {
         }
         
-        public DbSet<Account> Accounts { get; set; }
-        public DbSet<Transaction> Transactions { get; set; }
+        public virtual DbSet<Account> Accounts { get; set; } // Make this property virtual
         
+        public virtual DbSet<Transaction> Transactions { get; set; } // Also make other DbSets virtual if you mock them
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

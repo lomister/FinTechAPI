@@ -1,13 +1,10 @@
 ﻿// AccountsController.cs
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using FinTechAPI.Data;
 using FinTechAPI.Models;
+using FinTechAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FinTechAPI.Controllers
 {
@@ -16,151 +13,116 @@ namespace FinTechAPI.Controllers
     [Route("api/[controller]")]
     public class AccountsController : ControllerBase
     {
+        private readonly IAccountService _accountService;
         private readonly FinTechDbContext _context;
-        
-        public AccountsController(FinTechDbContext context)
+
+        public AccountsController(
+            IAccountService accountService,
+            FinTechDbContext context)
         {
+            _accountService = accountService;
             _context = context;
         }
         
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Account>>> GetAccounts()
+        private string GetCurrentUserId()
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+        }
+        
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<AccountDto>>> GetAccounts()
+        {
+            var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                return Unauthorized();
+                return Unauthorized(new { message = "User ID not found in token." });
             }
-            
-            var accounts = await _context.Accounts
-                .Where(a => a.UserId == userId)
-                .Select(a => new AccountDto
-                {
-                    Id = a.Id,
-                    Name = a.Name,
-                    Balance = a.Balance
-                })
-                .ToListAsync();
-                
+
+            var accounts = await _accountService.GetAccountsByUserIdAsync(userId);
             return Ok(accounts);
         }
         
         [HttpGet("{id}")]
         public async Task<ActionResult<Account>> GetAccount(int id)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+            var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                return Unauthorized();
+                return Unauthorized(new { message = "User ID not found in token." });
             }
-            
-            var account = await _context.Accounts
-                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
-                
+
+            var account = await _accountService.GetAccountByIdAsync(id, userId);
+
             if (account == null)
             {
-                return NotFound();
+                return NotFound(new { message = $"Account with ID {id} not found for the current user." });
             }
-            
+
             return Ok(account);
         }
+
         
         [HttpPost]
-        public async Task<ActionResult<Account>> CreateAccount(Account account)
+        public async Task<ActionResult<Account>> CreateAccount([FromBody] Account account) 
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+            var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                return Unauthorized();
+                return Unauthorized(new { message = "User ID not found in token." });
             }
+
+            var createdAccount = await _accountService.CreateAccountAsync(account, userId);
             
-            // Ensure that the account belongs to the authenticated user
-            account.UserId = userId;
-            account.CreatedAt = DateTime.UtcNow;
-            account.UpdatedAt = DateTime.UtcNow;
-            
-            _context.Accounts.Add(account);
-            await _context.SaveChangesAsync();
-            
-            return CreatedAtAction(nameof(GetAccount), new { id = account.Id }, account);
+            return CreatedAtAction(nameof(GetAccount), new { id = createdAccount.Id }, createdAccount);
         }
+
         
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateAccount(int id, Account account)
+               [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateAccount(int id, [FromBody] Account accountUpdateDetails) 
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+            var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                return Unauthorized();
+                return Unauthorized(new { message = "User ID not found in token." });
             }
-            
-            if (id != account.Id)
+
+            if (id != accountUpdateDetails.Id)
             {
-                return BadRequest();
+                return BadRequest(new { message = "Account ID in URL and body do not match." });
             }
-            
-            var existingAccount = await _context.Accounts
-                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
-                
-            if (existingAccount == null)
+
+            var updatedAccount = await _accountService.UpdateAccountAsync(id, accountUpdateDetails, userId);
+
+            if (updatedAccount == null)
             {
-                return NotFound();
+                 if (!await _accountService.AccountExistsAsync(id, userId))
+                 {
+                    return NotFound(new { message = $"Account with ID {id} not found for the current user." });
+                 }
+
+                 return NotFound(new { message = $"Account with ID {id} not found or update failed." });
             }
-            
-            // Update account properties
-            existingAccount.Name = account.Name;
-            existingAccount.AccountType = account.AccountType;
-            existingAccount.Balance = account.Balance;  // Note: Be cautious with direct balance updates in production
-            existingAccount.Currency = account.Currency;
-            existingAccount.UpdatedAt = DateTime.UtcNow;
-            
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!AccountExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-            
+
             return NoContent();
         }
         
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAccount(int id)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
+            var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                return Unauthorized();
+                return Unauthorized(new { message = "User ID not found in token." });
             }
-            
-            var account = await _context.Accounts
-                .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId);
-                
-            if (account == null)
+
+            var success = await _accountService.DeleteAccountAsync(id, userId);
+
+            if (!success)
             {
-                return NotFound();
+                return NotFound(new { message = $"Account with ID {id} not found for the current user." });
             }
-            
-            // Additional logic could be added here to handle related transactions or data consistency
-            
-            _context.Accounts.Remove(account);
-            await _context.SaveChangesAsync();
-            
-            return NoContent();
+
+            return NoContent(); 
         }
         
         private bool AccountExists(int id)

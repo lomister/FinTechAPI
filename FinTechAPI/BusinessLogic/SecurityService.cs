@@ -2,10 +2,11 @@ using FinTechAPI.Models;
 using System.Collections.Generic;
 using System.Linq;
 using FinTechAPI.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace FinTechAPI.Services
 {
-    public class SecurityService
+    public class SecurityService : ISecurityService
     {
         private readonly FinTechDbContext _context;
 
@@ -19,5 +20,13 @@ namespace FinTechAPI.Services
         {
             return _context.Transactions.Where(t => t.Amount > threshold).ToList();
         }
+        
+        public async Task<IEnumerable<Transaction>> DetectAnomaliesAsync(decimal threshold)
+        {
+            return await _context.Transactions
+                .Where(t => t.Amount > threshold)
+                .ToListAsync();
+        }
+
     }
 }

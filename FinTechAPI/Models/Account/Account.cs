@@ -1,6 +1,4 @@
 ﻿// Account.cs
-using System;
-using System.Collections.Generic;
 
 namespace FinTechAPI.Models
 {

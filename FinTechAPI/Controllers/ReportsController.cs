@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using FinTechAPI.Services;
 using System.Collections.Generic;
+using System.Security.Claims;
+using FinTechAPI.DTOs;
 using FinTechAPI.Models;
 
 namespace FinTechAPI.Controllers
@@ -15,34 +17,37 @@ namespace FinTechAPI.Controllers
         {
             _reportingService = reportingService;
         }
-
-        // GET: api/reports/category/{category}
-        [HttpGet("category/{category}")]
-        public ActionResult<IEnumerable<Transaction>> GetTransactionsByCategory(string category)
+        
+        private string GetCurrentUserId()
         {
-            var transactions = _reportingService.GetTransactionsByCategory(category);
-            return Ok(transactions);
-        }
-
-        // GET: api/reports/date-range?startDate={startDate}&endDate={endDate}
-        [HttpGet("date-range")]
-        public ActionResult<IEnumerable<Transaction>> GetTransactionsByDateRange(string startDate, string endDate)
-        {
-            if (DateTime.TryParse(startDate, out DateTime parsedStartDate) && DateTime.TryParse(endDate, out DateTime parsedEndDate))
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
             {
-                var transactions = _reportingService.GetTransactionsByDateRange(parsedStartDate, parsedEndDate);
-                return Ok(transactions);
+                throw new InvalidOperationException("User ID not found in token.");
             }
-            return BadRequest("Invalid date format.");
+            return userId;
         }
 
-        // GET: api/reports/total-amount?category={category}
-        [HttpGet("total-amount")]
-        public ActionResult<decimal> GetTotalAmount(string category)
+        [HttpGet("by-type/{transactionType}")]
+        public async Task<ActionResult<IEnumerable<TransactionDto>>> GetTransactionsByTypeReport(TransactionType transactionType)
         {
-            var transactions = _reportingService.GetTransactionsByCategory(category);
-            var totalAmount = _reportingService.CalculateTotalAmount(transactions);
-            return Ok(totalAmount);
+            var userId = GetCurrentUserId(); 
+
+            var userTransactions = await _reportingService.GetTransactionsByTypeAsync(transactionType, userId);
+
+            var transactionDtos = userTransactions.Select(t => new TransactionDto
+            {
+                Id = t.Id,
+                Amount = t.Amount,
+                Currency = t.Currency,
+                Type = t.Type,
+                Description = t.Description,
+                TransactionDate = t.TransactionDate,
+                CreatedAt = t.CreatedAt,
+                AccountId = t.AccountId
+            });
+
+            return Ok(transactionDtos);
         }
     }
 }

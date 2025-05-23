@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using FinTechAPI.Data;
 using FinTechAPI.Models;
+using FinTechAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -89,11 +90,11 @@ namespace FinTechAPI.Controllers
             _context.Transactions.Add(transaction);
             
             // Update account balance
-            if (transaction.Category == "Income")
+            if (transaction.Type == TransactionType.Income)
             {
                 account.Balance += transaction.Amount;
             }
-            else if (transaction.Category == "Expense")
+            else if (transaction.Type == TransactionType.Expense)
             {
                 account.Balance -= transaction.Amount;
             }
@@ -132,29 +133,35 @@ namespace FinTechAPI.Controllers
             // Adjust account balance based on transaction change
             var account = existingTransaction.Account;
             
+            
+            if(account == null)
+            {
+                return NotFound();
+            }
+            
             // Revert previous transaction effect
-            if (existingTransaction.Category == "Income")
+            if (existingTransaction.Type == TransactionType.Income)
             {
                 account.Balance -= existingTransaction.Amount;
             }
-            else if (existingTransaction.Category == "Expense")
+            else if (existingTransaction.Type == TransactionType.Expense)
             {
                 account.Balance += existingTransaction.Amount;
             }
             
             // Apply new transaction effect
-            if (transaction.Category == "Income")
+            if (transaction.Type == TransactionType.Income)
             {
                 account.Balance += transaction.Amount;
             }
-            else if (transaction.Category == "Expense")
+            else if (transaction.Type == TransactionType.Expense)
             {
                 account.Balance -= transaction.Amount;
             }
             
             // Update transaction
             existingTransaction.Amount = transaction.Amount;
-            existingTransaction.Category = transaction.Category;
+            existingTransaction.Type = transaction.Type;
             existingTransaction.Description = transaction.Description;
             existingTransaction.TransactionDate = transaction.TransactionDate;
             existingTransaction.UpdatedAt = DateTime.UtcNow;
@@ -171,10 +178,8 @@ namespace FinTechAPI.Controllers
                 {
                     return NotFound();
                 }
-                else
-                {
-                    throw;
-                }
+
+                throw;
             }
             
             return NoContent();
@@ -202,11 +207,16 @@ namespace FinTechAPI.Controllers
             // Adjust account balance when deleting transaction
             var account = transaction.Account;
             
-            if (transaction.Category == "Income")
+            if (account == null)
+            {
+                return NotFound();
+            }
+            
+            if (transaction.Type == TransactionType.Income)
             {
                 account.Balance -= transaction.Amount;
             }
-            else if (transaction.Category == "Expense")
+            else if (transaction.Type == TransactionType.Expense)
             {
                 account.Balance += transaction.Amount;
             }

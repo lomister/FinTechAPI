@@ -32,7 +32,10 @@ builder.Services.AddIdentity<User, IdentityRole>()
 // Add ReportingService to the container
 builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<SecurityService>();
-
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IReportingService, ReportingService>(); 
+builder.Services.AddScoped<ISecurityService, SecurityService>(); // Изменено
+builder.Services.AddScoped<ITransactionService, TransactionService>();
 
 // Configure Authentication
 var authSettingsSection = builder.Configuration.GetSection("AuthSettings");
