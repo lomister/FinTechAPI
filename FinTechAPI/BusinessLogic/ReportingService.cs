@@ -26,7 +26,7 @@ namespace FinTechAPI.Services
         public async Task<IEnumerable<Transaction>> GetTransactionsByDateRangeAsync(DateTime startDate, DateTime endDate)
         {
             return await _context.Transactions
-                .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate) // Используем TransactionDate
+                .Where(t => t.TransactionDate >= startDate && t.TransactionDate <= endDate)
                 .OrderByDescending(t => t.TransactionDate)
                 .ToListAsync();
         }

@@ -34,7 +34,7 @@ builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<SecurityService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IReportingService, ReportingService>(); 
-builder.Services.AddScoped<ISecurityService, SecurityService>(); // Изменено
+builder.Services.AddScoped<ISecurityService, SecurityService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 
 // Configure Authentication
